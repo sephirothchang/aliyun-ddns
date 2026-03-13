@@ -1,0 +1,9 @@
+services:
+  aliyun-ddns:
+    build: .
+    image: aliyun-ddns:latest
+    container_name: aliyun-ddns
+    restart: unless-stopped
+    volumes:
+      - ./config.yml:/app/config.yml:ro
+    command: ["python", "/app/ddns_updater.py", "--config", "/app/config.yml"]

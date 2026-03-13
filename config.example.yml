@@ -1,0 +1,22 @@
+# 阿里云访问凭证
+access_key_id: "your-access-key-id"
+access_key_secret: "your-access-key-secret"
+
+# 区域与解析参数
+region_id: "cn-hangzhou"
+domain_name: "example.com"
+rr: "home"
+record_type: "A" # IPv4 用 A，IPv6 用 AAAA
+
+# TTL 与轮询间隔（秒）
+ttl: 600
+interval_seconds: 60
+
+# 可选：阿里云 DNS API endpoint
+endpoint: "alidns.cn-hangzhou.aliyuncs.com"
+
+# 可选：公网 IP 获取地址（按顺序重试）
+ip_sources:
+  - "https://api.ipify.org"
+  - "https://ifconfig.me/ip"
+  - "https://ip.sb"
