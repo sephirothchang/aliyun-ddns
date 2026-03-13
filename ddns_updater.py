@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import logging
+import os
 import sys
 import time
 from dataclasses import dataclass
@@ -9,8 +10,8 @@ from typing import Optional
 
 import requests
 import yaml
-from alibabacloud_alidns20150109.client import Client as AlidnsClient
 from alibabacloud_alidns20150109 import models as alidns_models
+from alibabacloud_alidns20150109.client import Client as AlidnsClient
 from alibabacloud_tea_openapi import models as open_api_models
 
 
@@ -24,9 +25,23 @@ class Config:
     record_type: str
     ttl: int
     interval_seconds: int
+    timezone: str
     endpoint: str
     ip_sources: list[str]
 
+
+def _pick_str(raw: dict, *keys: str, default: Optional[str] = None) -> Optional[str]:
+    for key in keys:
+        if key in raw and raw[key] not in (None, ""):
+            return str(raw[key])
+    return default
+
+
+def _pick_int(raw: dict, *keys: str, default: Optional[int] = None) -> Optional[int]:
+    for key in keys:
+        if key in raw and raw[key] not in (None, ""):
+            return int(raw[key])
+    return default
 
 
 def load_config(path: Path) -> Config:
@@ -36,17 +51,23 @@ def load_config(path: Path) -> Config:
     with path.open("r", encoding="utf-8") as f:
         raw = yaml.safe_load(f) or {}
 
-    required = [
-        "access_key_id",
-        "access_key_secret",
-        "region_id",
-        "domain_name",
-        "rr",
-        "record_type",
-        "ttl",
-        "interval_seconds",
-    ]
-    missing = [k for k in required if k not in raw or raw[k] in (None, "")]
+    access_key_id = _pick_str(raw, "access_key_id", "access_id")
+    access_key_secret = _pick_str(raw, "access_key_secret", "access_secret")
+    domain_name = _pick_str(raw, "domain_name", "domain")
+    rr = _pick_str(raw, "rr", default="@")
+    record_type = _pick_str(raw, "record_type", "type")
+    ttl = _pick_int(raw, "ttl")
+    interval_seconds = _pick_int(raw, "interval_seconds", "redo")
+
+    required_values = {
+        "access_key_id/access_id": access_key_id,
+        "access_key_secret/access_secret": access_key_secret,
+        "domain_name/domain": domain_name,
+        "record_type/type": record_type,
+        "ttl": ttl,
+        "interval_seconds/redo": interval_seconds,
+    }
+    missing = [k for k, v in required_values.items() if v in (None, "")]
     if missing:
         raise ValueError(f"配置文件缺少必填项: {', '.join(missing)}")
 
@@ -57,19 +78,22 @@ def load_config(path: Path) -> Config:
     if not isinstance(ip_sources, list) or not ip_sources:
         raise ValueError("ip_sources 必须是非空数组")
 
+    region_id = _pick_str(raw, "region_id", default="cn-hangzhou")
+    timezone = _pick_str(raw, "timezone", default="Asia/Shanghai")
+
     return Config(
-        access_key_id=str(raw["access_key_id"]),
-        access_key_secret=str(raw["access_key_secret"]),
-        region_id=str(raw["region_id"]),
-        domain_name=str(raw["domain_name"]),
-        rr=str(raw["rr"]),
-        record_type=str(raw["record_type"]).upper(),
-        ttl=int(raw["ttl"]),
-        interval_seconds=int(raw["interval_seconds"]),
+        access_key_id=access_key_id,
+        access_key_secret=access_key_secret,
+        region_id=region_id,
+        domain_name=domain_name,
+        rr=rr,
+        record_type=str(record_type).upper(),
+        ttl=int(ttl),
+        interval_seconds=int(interval_seconds),
+        timezone=timezone,
         endpoint=str(raw.get("endpoint", "alidns.cn-hangzhou.aliyuncs.com")),
         ip_sources=[str(x) for x in ip_sources],
     )
-
 
 
 def create_client(config: Config) -> AlidnsClient:
@@ -80,7 +104,6 @@ def create_client(config: Config) -> AlidnsClient:
         endpoint=config.endpoint,
     )
     return AlidnsClient(open_api_config)
-
 
 
 def get_public_ip(sources: list[str], timeout: int = 5) -> str:
@@ -99,7 +122,6 @@ def get_public_ip(sources: list[str], timeout: int = 5) -> str:
     raise RuntimeError(f"无法获取公网 IP，最后错误: {last_error}")
 
 
-
 def find_record(client: AlidnsClient, config: Config):
     req = alidns_models.DescribeSubDomainRecordsRequest(
         sub_domain=f"{config.rr}.{config.domain_name}",
@@ -111,7 +133,6 @@ def find_record(client: AlidnsClient, config: Config):
         return None
 
     return records.record[0]
-
 
 
 def create_record(client: AlidnsClient, config: Config, value: str) -> None:
@@ -126,7 +147,6 @@ def create_record(client: AlidnsClient, config: Config, value: str) -> None:
     logging.info("已创建解析记录: %s.%s -> %s", config.rr, config.domain_name, value)
 
 
-
 def update_record(client: AlidnsClient, config: Config, record_id: str, value: str) -> None:
     req = alidns_models.UpdateDomainRecordRequest(
         record_id=record_id,
@@ -137,7 +157,6 @@ def update_record(client: AlidnsClient, config: Config, record_id: str, value: s
     )
     client.update_domain_record(req)
     logging.info("已更新解析记录: %s.%s -> %s", config.rr, config.domain_name, value)
-
 
 
 def run_once(client: AlidnsClient, config: Config) -> None:
@@ -158,13 +177,12 @@ def run_once(client: AlidnsClient, config: Config) -> None:
     update_record(client, config, record.record_id, ip)
 
 
-
 def main() -> int:
     parser = argparse.ArgumentParser(description="阿里云 DDNS 自动更新")
     parser.add_argument(
         "--config",
-        default="/app/config.yml",
-        help="配置文件路径，默认 /app/config.yml",
+        default="/app/config.yaml",
+        help="配置文件路径，默认 /app/config.yaml",
     )
     args = parser.parse_args()
 
@@ -176,10 +194,18 @@ def main() -> int:
     try:
         config = load_config(Path(args.config))
         if config.interval_seconds <= 0:
-            raise ValueError("interval_seconds 必须 > 0")
+            raise ValueError("interval_seconds/redo 必须 > 0")
+
+        os.environ["TZ"] = config.timezone
+        if hasattr(time, "tzset"):
+            time.tzset()
 
         client = create_client(config)
-        logging.info("DDNS 服务已启动，检查间隔: %s 秒", config.interval_seconds)
+        logging.info(
+            "DDNS 服务已启动，检查间隔: %s 秒，时区: %s",
+            config.interval_seconds,
+            config.timezone,
+        )
 
         while True:
             try:
