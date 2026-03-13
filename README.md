@@ -60,3 +60,21 @@ docker compose up -d --build
 ```bash
 docker compose down
 ```
+
+
+## GitHub Actions 自动构建并发布镜像
+项目已包含工作流：`.github/workflows/docker-publish.yml`，会在以下场景自动构建并推送镜像到 GHCR：
+- push 到 `main` 分支
+- push 形如 `v*.*.*` 的 tag（例如 `v1.0.0`）
+- 手动触发 (`workflow_dispatch`)
+
+默认发布镜像地址：
+- `ghcr.io/<你的用户名>/<你的仓库名>:latest`（main 分支）
+- `ghcr.io/<你的用户名>/<你的仓库名>:<tag>`（版本标签）
+- `ghcr.io/<你的用户名>/<你的仓库名>:sha-xxxxxxx`
+
+使用前请确认：
+1. 仓库 `Settings -> Actions -> General` 中允许 `Read and write permissions`（让 `GITHUB_TOKEN` 可推送 `packages`）。
+2. 在仓库的 Packages 权限里允许当前仓库发布 GHCR 镜像。
+3. 首次发布后可在 GitHub 的 `Packages` 页面查看并拉取镜像。
+
