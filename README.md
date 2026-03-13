@@ -14,7 +14,7 @@
 先创建本地配置文件：
 
 ```bash
-cp config.example.yml ./config.yaml
+cp config.example.yaml ./config.yaml
 ```
 
 关键参数（你要求的字段）：
@@ -26,25 +26,24 @@ cp config.example.yml ./config.yaml
 - `timezone`
 - `type`（等价于 `record_type`）
 
-## 构建镜像
-```bash
-docker build -t aliyun-ddns:latest .
-```
+## 运行容器（直接使用 CI 发布镜像）
+> 将下面镜像地址替换成你自己 GHCR 仓库地址。
 
-## 运行容器（挂载本地配置文件）
 ```bash
 docker run -d \
   --name aliyun-ddns \
   --restart unless-stopped \
   -v $(pwd)/config.yaml:/app/config.yaml:ro \
-  aliyun-ddns:latest
+  ghcr.io/<your-github-username>/aliyun-ddns:latest
 ```
 
-## 使用 Docker Compose
+## 使用 Docker Compose（不包含本地 build）
+`docker-compose.yml` 默认直接拉取 GHCR 镜像，不执行本地构建。
+
 在项目目录准备好 `./config.yaml` 后，直接运行：
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
 停止服务：
