@@ -5,5 +5,5 @@ services:
     container_name: aliyun-ddns
     restart: unless-stopped
     volumes:
-      - ./config.yml:/app/config.yml:ro
-    command: ["python", "/app/ddns_updater.py", "--config", "/app/config.yml"]
+      - ./config.yaml:/app/config.yaml:ro
+    command: ["python", "/app/ddns_updater.py", "--config", "/app/config.yaml"]

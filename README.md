@@ -9,47 +9,39 @@
 - 所有参数通过外部配置文件传入。
 
 ## 配置文件
-复制 `config.example.yml` 为你自己的 `config.yml` 并填写参数。
+默认读取容器路径：`/app/config.yaml`。
 
-关键参数：
-- `access_key_id`
-- `access_key_secret`
-- `region_id`
+先创建本地配置文件：
+
+```bash
+cp config.example.yml ./config.yaml
+```
+
+关键参数（你要求的字段）：
+- `access_id`（或 `access_key_id`）
+- `access_secret`（或 `access_key_secret`）
 - `domain_name`
-- `rr`
-- `record_type` (`A` 或 `AAAA`)
+- `redo`（更新间隔秒数；等价于 `interval_seconds`）
 - `ttl`
-- `interval_seconds`
+- `timezone`
+- `type`（等价于 `record_type`）
 
 ## 构建镜像
 ```bash
 docker build -t aliyun-ddns:latest .
 ```
 
-## 运行容器
+## 运行容器（挂载本地配置文件）
 ```bash
 docker run -d \
   --name aliyun-ddns \
   --restart unless-stopped \
-  -v /path/to/config.yml:/app/config.yml:ro \
+  -v $(pwd)/config.yaml:/app/config.yaml:ro \
   aliyun-ddns:latest
 ```
 
-> 群辉 Docker 也可以用同样思路：将 `config.yml` 挂载到容器 `/app/config.yml`。
-
-## 可选：自定义配置路径
-```bash
-docker run -d \
-  --name aliyun-ddns \
-  --restart unless-stopped \
-  -v /path/to/my-config.yml:/data/my-config.yml:ro \
-  aliyun-ddns:latest \
-  python /app/ddns_updater.py --config /data/my-config.yml
-```
-
-
 ## 使用 Docker Compose
-在项目目录准备好 `config.yml` 后，直接运行：
+在项目目录准备好 `./config.yaml` 后，直接运行：
 
 ```bash
 docker compose up -d --build
@@ -60,21 +52,3 @@ docker compose up -d --build
 ```bash
 docker compose down
 ```
-
-
-## GitHub Actions 自动构建并发布镜像
-项目已包含工作流：`.github/workflows/docker-publish.yml`，会在以下场景自动构建并推送镜像到 GHCR：
-- push 到 `main` 分支
-- push 形如 `v*.*.*` 的 tag（例如 `v1.0.0`）
-- 手动触发 (`workflow_dispatch`)
-
-默认发布镜像地址：
-- `ghcr.io/<你的用户名>/<你的仓库名>:latest`（main 分支）
-- `ghcr.io/<你的用户名>/<你的仓库名>:<tag>`（版本标签）
-- `ghcr.io/<你的用户名>/<你的仓库名>:sha-xxxxxxx`
-
-使用前请确认：
-1. 仓库 `Settings -> Actions -> General` 中允许 `Read and write permissions`（让 `GITHUB_TOKEN` 可推送 `packages`）。
-2. 在仓库的 Packages 权限里允许当前仓库发布 GHCR 镜像。
-3. 首次发布后可在 GitHub 的 `Packages` 页面查看并拉取镜像。
-
