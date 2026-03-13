@@ -14,7 +14,7 @@
 先创建本地配置文件：
 
 ```bash
-cp config.example.yml ./config.yaml
+cp config.example.yaml ./config.yaml
 ```
 
 关键参数（你要求的字段）：
